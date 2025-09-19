@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Anime Netflix - Character Detail</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <h1 class="logo">Anime Netflix</h1>
+    <a href="index.html" class="back-link">Back to Home</a>
+  </header>
+  <main>
+    <h2 id="characterName" class="page-title"></h2>
+    <div class="character-detail">
+      <img id="characterImage" src="" alt="" class="character-image" />
+      <div class="character-bio" id="characterBio">
+        <!-- Bio details will be inserted here -->
+      </div>
+    </div>
+  </main>
+  <script src="script.js"></script>
+  <script>
+    // Get character ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const charId = urlParams.get('id');
+
+    async function fetchCharacterDetails(id) {
+      try {
+        const response = await fetch(`https://api.jikan.moe/v4/characters/${id}/full`);
+        const data = await response.json();
+        return data.data; // character object
+      } catch (error) {
+        console.error('Error fetching character details:', error);
+        return null;
+      }
+    }
+
+      async function loadCharacter() {
+        const nameElem = document.getElementById('characterName');
+        const imageElem = document.getElementById('characterImage');
+        const bioContainer = document.getElementById('characterBio');
+
+        bioContainer.innerHTML = '<p>Loading character details...</p>';
+
+        const character = await fetchCharacterDetails(charId);
+
+        if (!character) {
+          nameElem.textContent = 'Character not found';
+          bioContainer.innerHTML = '<p>Error loading character details.</p>';
+          return;
+        }
+
+        // Remove comma between surname and name if present
+        // Convert "Last, First" to "First Last" by splitting and reversing
+        const nameParts = character.name.split(',').map(part => part.trim());
+        if (nameParts.length === 2) {
+          nameElem.textContent = `${nameParts[1]} ${nameParts[0]}`;
+        } else {
+          nameElem.textContent = character.name;
+        }
+        imageElem.src = character.images.jpg.image_url;
+        imageElem.alt = character.name;
+
+        // Parse the about text into sections heuristically
+        function parseAboutText(about) {
+          if (!about) return { Backstory: "No detailed backstory available." };
+
+          // Split by newlines or periods followed by uppercase letter as rough section breaks
+          const lines = about.split(/(?:\.\s+|\n)/).map(line => line.trim()).filter(Boolean);
+
+          // Heuristic keywords for sections
+          const sections = {
+            "BASIC INFO": [],
+            "FAMILY": [],
+            "PERSONALITY": [],
+            "ABILITIES/SKILLS": [],
+            "BACKSTORY": []
+          };
+
+          // Simple keyword matching to assign lines to sections
+          lines.forEach(line => {
+            const lower = line.toLowerCase();
+            if (lower.includes("father") || lower.includes("mother") || lower.includes("sibling")) {
+              sections["FAMILY"].push(line);
+            } else if (lower.includes("like") || lower.includes("dislike") || lower.includes("quality") || lower.includes("personality")) {
+              sections["PERSONALITY"].push(line);
+            } else if (lower.includes("skill") || lower.includes("ability") || lower.includes("power") || lower.includes("technique")) {
+              sections["ABILITIES/SKILLS"].push(line);
+            } else if (lower.includes("age") || lower.includes("birthday") || lower.includes("height") || lower.includes("weight") || lower.includes("blood type") || lower.includes("hair") || lower.includes("eye")) {
+              sections["BASIC INFO"].push(line);
+            } else {
+              sections["BACKSTORY"].push(line);
+            }
+          });
+
+          // Remove empty sections
+          Object.keys(sections).forEach(key => {
+            if (sections[key].length === 0) {
+              delete sections[key];
+            }
+          });
+
+          // Join arrays into strings
+          Object.keys(sections).forEach(key => {
+            sections[key] = sections[key].join('. ') + (sections[key].length > 0 ? '.' : '');
+          });
+
+          return sections;
+        }
+
+        const parsedSections = parseAboutText(character.about);
+
+        function createSection(title, content) {
+          const section = document.createElement('div');
+          section.className = 'info-section';
+
+          const header = document.createElement('h3');
+          header.className = 'section-header';
+          header.textContent = title;
+          // No toggle for backstory, always expanded
+          if (title.toLowerCase().includes("backstory")) {
+            header.style.fontWeight = 'bold';
+            header.style.color = '#000000';
+          } else {
+            header.onclick = () => {
+              contentDiv.classList.toggle('collapsed');
+            };
+          }
+
+          const contentDiv = document.createElement('div');
+          contentDiv.className = 'section-content';
+
+          // Always add backstory class for styling paragraph
+          if (title.toLowerCase().includes("backstory")) {
+            contentDiv.classList.add('backstory');
+          }
+
+          // Show content as a single paragraph string
+          const p = document.createElement('p');
+          p.textContent = content;
+          contentDiv.appendChild(p);
+
+          section.appendChild(header);
+          section.appendChild(contentDiv);
+          return section;
+        }
+
+        bioContainer.innerHTML = '';
+
+        for (const [sectionTitle, sectionContent] of Object.entries(parsedSections)) {
+          const sectionElement = createSection(sectionTitle, sectionContent);
+          bioContainer.appendChild(sectionElement);
+        }
+      }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (charId) {
+        loadCharacter();
+      } else {
+        document.getElementById('characterName').textContent = 'Character not found';
+      }
+    });
+  </script>
+</body>
+</html>

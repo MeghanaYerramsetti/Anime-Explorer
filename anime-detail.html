@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Anime Netflix - Anime Detail</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <h1 class="logo">ANIFLEX</h1>
+    <a href="index.html" class="back-link">Back to Home</a>
+  </header>
+  <main>
+    <h2 id="animeTitle" class="page-title"></h2>
+    <section class="character-grid" id="characterGrid">
+      <!-- Character cards will be dynamically inserted here -->
+    </section>
+  </main>
+  <script src="script.js"></script>
+  <script>
+    // Get anime ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const animeId = urlParams.get('id');
+
+    async function fetchAnimeCharacters(id) {
+      try {
+        const response = await fetch(`https://api.jikan.moe/v4/anime/${id}/characters`);
+        const data = await response.json();
+        return data.data; // array of character objects
+      } catch (error) {
+        console.error('Error fetching anime characters:', error);
+        return [];
+      }
+    }
+
+    async function loadCharacters() {
+      const titleElem = document.getElementById('animeTitle');
+      const grid = document.getElementById('characterGrid');
+      grid.innerHTML = '<p>Loading characters...</p>';
+
+      try {
+        // Fetch anime details for title
+        const animeResponse = await fetch(`https://api.jikan.moe/v4/anime/${animeId}`);
+        const animeData = await animeResponse.json();
+        titleElem.textContent = animeData.data.title;
+
+        // Fetch characters
+        const characters = await fetchAnimeCharacters(animeId);
+        grid.innerHTML = '';
+
+        if (characters.length === 0) {
+          grid.innerHTML = '<p>No characters found.</p>';
+          return;
+        }
+
+        characters.forEach(char => {
+          const card = document.createElement('div');
+          card.className = 'anime-card';
+          card.onclick = () => window.location.href = `character-detail.html?id=${char.character.mal_id}`;
+          card.innerHTML = `
+            <img src="${char.character.images.jpg.image_url}" alt="${char.character.name}" class="anime-poster" />
+            <div class="anime-title">${char.character.name}</div>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (error) {
+        titleElem.textContent = 'Anime not found';
+        grid.innerHTML = '<p>Error loading characters.</p>';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (animeId) {
+        loadCharacters();
+      } else {
+        document.getElementById('animeTitle').textContent = 'Anime not found';
+      }
+    });
+  </script>
+</body>
+</html>
